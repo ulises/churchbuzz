@@ -186,31 +186,19 @@
 ;;; will simply call g with the parameter passed (this is called the
 ;;; Z-combinator):
 
-;; Z = -> f { -> x { f[-> y { x[x][y] }] } [-> x { f[-> y { x[x][y] }] }] }
-
 (def Z-combinator
   (fn [f]
     ((fn [x] (f (fn [y] ((x x) y))))
      (fn [x] (f (fn [y] ((x x) y)))))))
-
 
 (def MOD
   (Z-combinator
    (fn [f]
      (fn [n]
        (fn [m]
-         (println "M:" (to-integer m) " N:" (to-integer n))
          (if (<= (to-integer m) (to-integer n))
-           (do (println "THEN")
-               (fn [x] (((f ((SUB n) m)) n) x)))
-           (do (println "ELSE:")
-               m)))))))
-;; (def MOD
-;;   (Z-combinator
-;;    (fn [f]
-;;      (fn [m]
-;;        (fn [n]
-;;          (((IF ((LEQ m) n)) (fn [x] (((f ((SUB m) n)) n) x))) m))))))
+           (fn [x] (((f ((SUB n) m)) m) x))
+           n))))))
 
 ;;; Ok, now we have a bunch of building blocks for our barebones FizzBuzz
 ;;; however we still need: ranges, map, string literals and a way of
@@ -268,20 +256,6 @@
 ;;; (m + 1) aren't larger than n.
 ;;; This observation will make it easier for us to write RANGE in terms of
 ;;; the basic operations we've just built.
-
-;; RANGE =
-;;   Z[-> f {
-;;     -> m { -> n {
-;;       IF[IS_LESS_OR_EQUAL[m][n]][
-;;         -> x {
-;;           UNSHIFT[f[INCREMENT[m]][n]][m][x]
-;;         }
-;;       ][EMPTY]
-;;     } }
-;;   }]
-
-
-(def RNG (fn [m n] (if (to-boolean ((LEQ m) n)) ((CONJ (RNG (INC m) n)) m) EMPTY)))
 
 (def RANGE
   (Z-combinator

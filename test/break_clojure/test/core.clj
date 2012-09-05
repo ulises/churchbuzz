@@ -67,8 +67,8 @@
   (to-integer (FIRST ((CONJ EMPTY) ONE))) => 1
   (to-integer (FIRST (REST ((CONJ ((CONJ EMPTY) TWO)) ONE)))) => 2)
 
-;; (fact "to-vector returns a vector with the elements in the list in the same order"
-;;   (map to-integer (to-vector ((CONJ ((CONJ EMPTY) ONE)) TWO))) => '(2 1))
+(fact "to-vector returns a vector with the elements in the list in the same order"
+  (map to-integer (to-vector ((CONJ ((CONJ EMPTY) ONE)) TWO))) => '(2 1))
 
 (fact "RANGE produces a range of numbers between m and n (inclusive)"
   (map to-integer (to-vector (RNG ZERO THREE))) => '(0 1 2 3)
