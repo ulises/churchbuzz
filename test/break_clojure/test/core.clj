@@ -73,3 +73,7 @@
 (fact "RANGE produces a range of numbers between m and n (inclusive)"
   (map to-integer (to-vector (RNG ZERO THREE))) => '(0 1 2 3)
   (map to-integer (to-vector ((RANGE ZERO) THREE))) => (map to-integer (to-vector (RNG ZERO THREE))))
+
+(fact "FOLD works!"
+  (to-integer (((FOLD ((RANGE ZERO) THREE)) ZERO) ADD)) => 6
+  (to-integer (((FOLD ((RANGE ONE) FOUR)) ONE) MULT)) => 24)

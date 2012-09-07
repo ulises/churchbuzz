@@ -45,6 +45,7 @@
 (def ONE (fn [f] (fn [x] (f x))))
 (def TWO (fn [f] (fn [x] (f (f x)))))
 (def THREE (fn [f] (fn [x] (f (f (f x))))))
+(def FOUR (fn [f] (fn [x] (f (f (f (f x)))))))
 
 (def FIVE
   (fn [f] (fn [x] (f (f (f (f (f x))))))))
@@ -249,6 +250,11 @@
        (reverse acc)
        (recur (REST l) (cons (FIRST l) acc)))))
 
+(defn to-integer-vector
+  "Convenience function to pretty-print ranges in the REPL."
+  [l]
+  (map to-integer (to-vector l)))
+
 ;;; Now we want to build ranges of NUMBERs. A slightly contrived
 ;;; way of doing so is to think as (range m n) as (conj (range (inc m) n) m)
 ;;; which is saying that the range of numbers between m and n is just
@@ -262,3 +268,35 @@
    (fn [f]
      (fn [m]
        (fn [n] (((IF ((LEQ m) n)) (fn [x] (((CONJ ((f (INC m)) n)) m) x))) EMPTY))))))
+
+
+;;; Ok, ranges out of the way means we need to be able to iterate over them.
+;;; For this, we're going to implement the map function. map is a higher-order
+;;; function (HOF) since it takes a function as one of its parameters.
+
+;;; We will implement map using a helper HOF called fold. fold recurseively
+;;; combines the items in a data structure using a combination function which
+;;; is passed as a parameter.
+
+;; FOLD =
+;;   Z[-> f {
+;;     -> l { -> x { -> g {
+;;       IF[IS_EMPTY[l]][
+;;         x
+;;       ][
+;;         -> y {
+;;           g[ f[REST[l]] [x] [g] ] [FIRST[l]][y]
+;;         }
+;;       ]
+;;     } } }
+;;   }]
+
+(def FOLD
+  (Z-combinator
+   (fn [f]
+     (fn [l]
+       (fn [x]
+         (fn [g]
+           (((IF (EMPTY? l))  x)
+            (fn [y]
+              (((g (((f (REST l)) x) g)) (FIRST l)) y)))))))))
