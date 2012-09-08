@@ -278,19 +278,6 @@
 ;;; combines the items in a data structure using a combination function which
 ;;; is passed as a parameter.
 
-;; FOLD =
-;;   Z[-> f {
-;;     -> l { -> x { -> g {
-;;       IF[IS_EMPTY[l]][
-;;         x
-;;       ][
-;;         -> y {
-;;           g[ f[REST[l]] [x] [g] ] [FIRST[l]][y]
-;;         }
-;;       ]
-;;     } } }
-;;   }]
-
 (def FOLD
   (Z-combinator
    (fn [f]
@@ -300,3 +287,17 @@
            (((IF (EMPTY? l))  x)
             (fn [y]
               (((g (((f (REST l)) x) g)) (FIRST l)) y)))))))))
+
+;;; Now that we have a FOLD helper function implemented, writing MAP is simple.
+;; MAP =
+;;   -> k { -> f {
+;;     FOLD[k][EMPTY][
+;;       -> l { -> x { UNSHIFT[l][f[x]] } }
+;;     ]
+;;   } }
+
+(def MAP
+  (fn [k]
+    (fn [f]
+      (((FOLD k) EMPTY) (fn [l]
+                          (fn [x] ((CONJ l) (f x))))))))

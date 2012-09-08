@@ -77,3 +77,7 @@
 (fact "FOLD works!"
   (to-integer (((FOLD ((RANGE ZERO) THREE)) ZERO) ADD)) => 6
   (to-integer (((FOLD ((RANGE ONE) FOUR)) ONE) MULT)) => 24)
+
+(fact "MAP based on FOLD maps a given function over a LIST of items"
+  (to-integer-vector ((MAP ((RANGE ZERO) FIVE)) INC)) => '(1 2 3 4 5 6)
+  (to-integer-vector ((MAP ((RANGE ZERO) FIVE)) DEC)) => '(0 0 1 2 3 4))
