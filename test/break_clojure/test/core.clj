@@ -71,8 +71,7 @@
   (map to-integer (to-vector ((CONJ ((CONJ EMPTY) ONE)) TWO))) => '(2 1))
 
 (fact "RANGE produces a range of numbers between m and n (inclusive)"
-  (map to-integer (to-vector (RNG ZERO THREE))) => '(0 1 2 3)
-  (map to-integer (to-vector ((RANGE ZERO) THREE))) => (map to-integer (to-vector (RNG ZERO THREE))))
+  (map to-integer (to-vector ((RANGE ZERO) THREE))) => '(0 1 2 3))
 
 (fact "FOLD works!"
   (to-integer (((FOLD ((RANGE ZERO) THREE)) ZERO) ADD)) => 6
@@ -81,3 +80,37 @@
 (fact "MAP based on FOLD maps a given function over a LIST of items"
   (to-integer-vector ((MAP ((RANGE ZERO) FIVE)) INC)) => '(1 2 3 4 5 6)
   (to-integer-vector ((MAP ((RANGE ZERO) FIVE)) DEC)) => '(0 0 1 2 3 4))
+
+(fact "The words Fizz, Buzz and FizzBuzz are encoded correctly"
+  (to-integer-vector Fizz) => '(11 12 14 14)
+  (to-integer-vector Buzz) => '(10 13 14 14)
+  (to-integer-vector FizzBuzz) => '(11 12 14 14 10 13 14 14))
+
+(fact "helper function to-string converts encoded strings to regular clojure strings"
+  (to-string Fizz) => "Fizz"
+  (to-string Buzz) => "Buzz"
+  (to-string FizzBuzz) => "FizzBuzz")
+
+(fact "DIV divides m by n"
+  (to-integer ((DIV FIFTEEN) FIVE)) => 3
+  (to-integer ((DIV FIVE) TWO)) => 2)
+
+(fact "REVERSE reverses lists"
+  (let [l ((CONJ ((CONJ EMPTY) ONE)) TWO)]
+    (to-integer-vector (REVERSE l)) => '(1 2)
+    (to-integer-vector (REVERSE (REVERSE l))) => (to-integer-vector l)))
+
+(fact "TODIGITS splits a natural number into a sequence of its digits"
+  (to-integer-vector (TODIGITS FIFTEEN)) => '(1 5)
+  (to-integer-vector (TODIGITS ONE-HUNDRED)) => '(1 0 0))
+
+(fact "to-string-vector returns a seq of strings from the given list"
+  (to-string-vector ((CONJ ((CONJ EMPTY) (TODIGITS ONE))) Buzz)) => '("Buzz" "1"))
+
+(fact "the FIZZBUZZ function returns FizzBuzz for numbers multiple of 3 and 5,
+Fizz for multiples of 5, Buzz for multiples of 3, and the number itself
+otherwise"
+  (to-string (FIZZBUZZ ONE)) => "1"
+  (to-string (FIZZBUZZ THREE)) => (to-string Buzz)
+  (to-string (FIZZBUZZ FIVE)) => (to-string Fizz)
+  (to-string (FIZZBUZZ FIFTEEN)) => (to-string FizzBuzz))

@@ -1,103 +1,182 @@
 (ns break-clojure.core)
 
-;;; The whole point of this exercise is to write the well-known FizzBuzz
-;;; algorithm. This algorithm iterates over a sequence of numbers in a range
-;;; and every time it comes across a number which is a multiple of 3 or
-;;; 5 it prints the words Fizz or Buzz respectively. If the number is
-;;; multiple of both numbers it prints FizzBuzz.
+;;; There's a very common question which is asked during interviews for
+;;; software engineering jobs. The candidate is asked to implement a version
+;;; of a game so-called Fizz-Buzz. The problem is very simple and any one
+;;; who can code should be able to implement a solution in a couple of
+;;; minutes. Surprisingly enough, some people claim that this in reality
+;;; is not quite so[1].
 
-;;; An initial version, with many constructs of clojure could be written as
+;;; The Fizz-Buzz problem is very simple: write a program that prints a sequence
+;;; of numbers from 1 to 100, however whenever it should print a multiple of 3
+;;; instead print the word "Fizz". For multiples of 5, print the word "Buzz"
+;;; and for multiples of both 3 and 5 print "FizzBuzz".
+
+;;; An implementation in clojure could be written as
 ;;; follows:
+
 ;; (defn fizzbuzz [n]
 ;;   (cond (and (zero? (mod n 3))
 ;;              (zero? (mod n 5))) "FizzBuzz"
 ;;              (zero? (mod n 3)) "Fizz"
 ;;              (zero? (mod n 5)) "Buzz"
-;;              :default n))
+;;              :default (str n))
+
 ;; (defn run []
 ;;   (map fizzbuzz (range 1 101)))
 
-;;; This implementation relies on many things including:
+;;; Here, instead of printing the numbers (and words) we're producing a sequence
+;;; for re-use later. I think most interviewers would be happy with this
+;;; solution, even if it returns the sequence instead of printing the values.
+
+;;; Now, to be able to implement a solution like the one above, we have relied
+;;; on several constructs that come as part of Clojure:
+
 ;;;   - all natural numbers between 1 and 100
 ;;;   - the ability to iterate over these
 ;;;   - the ability to check whether a number is 0
 ;;;   - the ability to branch depending on a particular predicate
+;;;   - the ability to represent strings
 
-;;; And now we want to build all these things from scratch and implement
-;;; FizzBuzz with them.
 
-;;; Natural numbers
-;;; the idea is that counting is based on comparing two bags of apples and oranges
-;;; if you take an apple, followed by taking an orange, and you find yourself with
-;;; two empty bags at the same time, you can conclude that both have the same
-;;; "number" of things in them (regardless of what these things are) although
-;;; you don't know what that number is.
-;;; Hence, numbers can be defined as applying an operation to an element many
-;;; times.
+;;; Following the footsteps of [2], where an implementation is offered using
+;;; only Ruby's Procs, we shall implement the above Fizz-Buzz algorithm
+;;; using only Clojure functions. In particular, and for no good reason,
+;;; we will also limit ourselves to single-parameter functions.
 
-(def ^{:doc "Utility function to get better reporting for NUMBERs.
-  Use like (to-integer NUMBER), e.g.
+;;; The first building block we need to implement are the natural numbers.
 
-  user> (to-integer ONE) ; 1"}
-  to-integer (fn [f] ((f inc) 0)))
+;;; Natural Numbers
+
+;;; To implement the natural numbers using only Clojure functions, we're going
+;;; to work with the following idea: counting can be thought of as comparing
+;;; two bags of apples and oranges. If you start taking an apple from the first
+;;; bag, followed by taking an orange from the other bag, and you find yourself
+;;; with two empty bags at the same time, you can conclude that both have the
+;;; same "number" of apples and oranges in each bag although you don't know what
+;;; that number is.
+;;; Hence, we can think of a "number" as applying an operation to an element a
+;;; a particular number of times.
+
+;;; And now onto some example numbers. Let's start with ZERO. If a NUMBER is the
+;;; application of an operation to an element a particular number of times, then
+;;; the NUMBER ZERO is the element itself:
 
 (def ZERO (fn [f] (fn [x] x)))
+
+;;; And ONE is the single application of the operation to the element:
+
 (def ONE (fn [f] (fn [x] (f x))))
+
+;;; And so on.
+
 (def TWO (fn [f] (fn [x] (f (f x)))))
 (def THREE (fn [f] (fn [x] (f (f (f x))))))
 (def FOUR (fn [f] (fn [x] (f (f (f (f x)))))))
-
 (def FIVE
   (fn [f] (fn [x] (f (f (f (f (f x))))))))
+
+;;; more numbers should go here...
 
 (def FIFTEEN
   (fn [f]
     (fn [x]
       (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x))))))))))))))))))
+
+;;; ...and plenty more in here...
+
 (def ONE-HUNDRED
   (fn [f]
     (fn [x]
       (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
 
-;;; Booleans
-;;;
-;;; Booleans can be implemented as two functions which simply choose one parameter over the other
+;;; By now it should be clear that defining all natural numbers like this is
+;;; really tiresome. But we'll get back to this later when we define operations
+;;; on NUMBERs.
 
-(def to-boolean (fn [f] ((f true) false)))
+
+;;; In any case, for easier inspection and to check that we're on the right
+;;; track, we'll define a helper function that'll convert one of our
+;;; implemented NUMBERs to a Clojure number.
+
+;;; Since numbers are the application of an operation to an element, to convert
+;;; a NUMBER to a Clojure number, we'll apply the function inc (which adds 1 to
+;;; the given number) to 0.
+
+(def ^{:doc "Utility function to get better reporting for NUMBERs.
+  Use like (to-integer NUMBER), e.g.
+
+  user> (to-integer FIVE) ; 5"}
+  to-integer (fn [number] ((number inc) 0)))
+
+
+;;; Booleans
+;;; For any kind of flow control in an algorithm, we need to be able to
+;;; tell whether an outcome is positive or negative. For this we'll use booleans.
+
+;;; Booleans can be implemented as two functions which simply choose one parameter over the other
 
 (def TRUE (fn [x] (fn [_] x)))
 (def FALSE (fn [_] (fn [y] y)))
 
+;;; Again, the obligatory helper function to check things in the REPL:
+(def ^{:doc "Utility function to convert BOOLEANs to Clojure booleans.
+  Use like (to-boolean BOOLEAN), e.g.
+
+  user> (to-boolean TRUE) ; true"}
+  to-boolean
+  (fn [bool] ((bool true) false)))
+
 ;;; IF-THEN-ELSE
-;;;
-;;; Implementing booleans is easy, and so we can implement if-then-else control
-;;; blocks on top of them rather easily
-;;; Initially one can implement IF along the lines of
-;;; (def IF (fn [pred] (fn [then] (fn [else] ((pred then) else)))))
-;;; however, this can be simplified as follows:
-;;; IF is written as a sequence of functions that take a single
-;;; value and return functions. In the end, a call to the function
-;;; returned by the predicate on the then-clause (pred then) is called
-;;; with the else clause. So, in principle, IF doesn't do much
-;;; other than call pred with the then- and else-clauses.
-;;; And so it can be simplified to be just the pred.
+
+;;; Now that we can represent positive and negative outcomes as booleans, we
+;;; can work on building an if-then-else flow control building block.
+
+;;; Initially one can implement IF along the lines of (in Clojure):
+
+;; (def IF (fn [pred] (fn [then] (fn [else] ((pred then) else)))))
+
+;;; In our code predicates will ultimate boil down to either TRUE or FALSE.
+;;; If pred evaluates to TRUE, then evaluating the entire IF form will be
+;;; equivalent to evaluating the 'then' form. If pred is FALSE, then the
+;;; evaluation of the 'else' part will be the result of the evaluation of
+;;; the entire IF form.
+
+;;; Hence, the implementation of IF can be simplified as follows:
+;;; the way IF is written so that the evaluation of the entire form
+;;; is actually the evaluation of the given predicate on the 'then' and the
+;;; 'else' forms. This is basically saying that IF is a wrapper around
+;;; the given predicate, and evaluating the IF form is equivalent to evaluating
+;;; the predicate form. So, in principle, IF doesn't do much other than call
+;;; pred with the then- and else-clauses. And so it can be simplified to be just
+;;; the pred.
 
 (def IF (fn [pred] pred))
 
-
 ;;; Predicates
-;;; As stated before, we need a way of checking whether a number is zero
-;;; or not.
-;;; If you recall, the way we defined the number zero was that given
-;;; a function, it would call it 0 times with the parameter given
-;;; so we can call NUMBER (the function) with a function that always
-;;; returns FALSE when invoked and with TRUE as its parameter, then
-;;; effectively we're checking whether whether NUMBER the function
-;;; is the ZERO function.
+
+;;; We now need to build some predicates that hopefully will be useful in the
+;;; future.
+
+;;; If you look at the proposed implementation of the Fizz-Buzz algorithm
+;;; in clojure we're trying to rewrite, you'll see we make use of zero?
+;;; which is a Clojure predicate that checks whether a given number is
+;;; 0 or not. Let's start with that one.
+
+;;; If you recall, we defined the number ZERO to be a function that applies
+;;; the given operation 0 times on the given element. Any other natural NUMBER
+;;; will apply the given operation N times on the element. Hence, to check if
+;;; a NUMBER is ZERO or any other natural, we need to check how many times the
+;;; given operation is applied. One or more applications means that the given
+;;; NUMBER is not ZERO. We'll define ZERO? then as a function that takes a
+;;; NUMBER and calls that number with an operation that returns FALSE and we'll
+;;; use as starting element TRUE. Hence, if the operation is applied at least
+;;; once, the result of (ZERO? NUMBER) will be FALSE.
 
 (def ZERO? (fn [number] ((number (fn [_] FALSE)) TRUE)))
 
 ;;; Numeric operations
+
 ;;; Now we need the ability to calculate the remainder of a division, and
 ;;; for that we need to know how to increment and decrement a NUMBER.
 
@@ -107,9 +186,7 @@
 (def POW (fn [n] (fn [m] ((m (MULT n)) ONE))))
 
 (def DEC (fn [number] (fn [f] (fn [x] (((number (fn [g] (fn [h] (h (g f)))))  (fn [y] x)) (fn [y] y))))))
-(def SUB (fn [n] (fn [m]
-                  ;; (println "N:" (to-integer n) " - M:" (to-integer m))
-                  ((m DEC) n))))
+(def SUB (fn [n] (fn [m] ((m DEC) n))))
 
 ;;; Modulo
 ;;; To implement FizzBuzz we need to be able to calculate the mod of two
@@ -147,7 +224,7 @@
 ;;            (fn [m]
 ;;              (((IF ((LEQ m) n)) (((MOD ((SUB n) m)) m) x)) n))))
 
-;;; However this will quickly result in a nast StackOverflow :-o
+;;; However this will quickly result in a nasty StackOverflow :-o
 ;;; The reason for this is that in clojure, (if...) is lazy in that if
 ;;; the predicate is false, then the then-clause is not evaluated. Our
 ;;; implementation of IF instead is eager, i.e. it will always evaluate
@@ -289,15 +366,147 @@
               (((g (((f (REST l)) x) g)) (FIRST l)) y)))))))))
 
 ;;; Now that we have a FOLD helper function implemented, writing MAP is simple.
-;; MAP =
-;;   -> k { -> f {
-;;     FOLD[k][EMPTY][
-;;       -> l { -> x { UNSHIFT[l][f[x]] } }
-;;     ]
-;;   } }
 
 (def MAP
   (fn [k]
     (fn [f]
-      (((FOLD k) EMPTY) (fn [l]
-                          (fn [x] ((CONJ l) (f x))))))))
+      (((FOLD k) EMPTY)
+       (fn [l]
+         (fn [x] ((CONJ l) (f x))))))))
+
+;;; We're nearly there. Recapping, we have the means of:
+;;; 1) Representing numbers
+;;; 2) Performing some arithmetic operations with them, including MOD
+;;; 3) Representing lists of things, including (but not limited to) ranges of
+;;;    numbers
+;;; 4) Iterating over lists of things and performing an arbitrary operation
+;;;    on these things
+
+;;; It looks like all we miss to be able to implement a full version of FizzBuzz
+;;; are strings (and strings representing numbers too!) Let's implement that.
+
+;;; Strings aren't that difficult to represent. We can represent them as a list
+;;; of numbers and then interpret each number according an encoding of our
+;;; choosing.
+;;; For FizzBuzz, it may be overkill to use a general purpose encoding scheme
+;;; like ASCII, so we'll design our own. We only need to encode the strings
+;;; "Fizz", "Buzz", FizzBuzz and the numbers 0 to 9. For the latter, we can
+;;; simply use the numbers 0 to 9, i.e. 0 represents "0", 1 "1", and so on.
+;;; That means we can use 10 to 14 for "B", "F", "i", "u", and "z".
+
+(def B ((MULT TWO) FIVE))
+(def F (INC B))
+(def i (INC F))
+(def u (INC i))
+(def z (INC u))
+
+(def Fizz ((CONJ ((CONJ ((CONJ ((CONJ EMPTY) z)) z)) i)) F))
+(def Buzz ((CONJ ((CONJ ((CONJ ((CONJ EMPTY) z)) z)) u)) B))
+(def FizzBuzz ((CONJ ((CONJ ((CONJ ((CONJ Buzz) z)) z)) i)) F))
+
+;;; Now that we have some string representation for the words Fizz, Buzz and
+;;; FizzBuzz, let's implement some helper functions for pretty printing these
+;;; in the REPL (just like we did for integers and lists).
+
+(defn to-char [n]
+  {:pre [(<= n 14) (>= n 0)]}
+  (nth (seq "0123456789BFiuz") n))
+
+(defn to-string [s]
+  (apply str (map to-char (to-integer-vector s))))
+
+;;; The final piece of the puzzle is the ability to represent a number as a
+;;; string, e.g. 154 as "154".
+;;; The first thing we need is a function that'll split a natural number into
+;;; a sequence of its digits, e.g. 154 -> '(1 5 4)
+
+;;; An example implementation in clojure is as follows:
+
+;; (defn to-digits
+;;   [n]
+;;   (conj (if (< n 10)
+;;           '()
+;;           (to-digits (int (/ n 10))))
+;;         (mod n 10)))
+
+;;; To rewrite this implementation using our own versions of IF, CONJ, MOD, etc.
+;;; we'll need to fist implement / (we can get away without implementing < and
+;;; checking for <= 9 instead of < 10).
+
+(def DIV
+  (Z-combinator
+   (fn [f]
+     (fn [m]
+       (fn [n]
+         (((IF ((LEQ n) m))
+           (fn [x]
+             ((INC ((f ((SUB m) n)) n)) x)))
+          ZERO))))))
+
+;;; Now we can go about implementing TODIGITS.
+
+(def TEN ((MULT TWO) FIVE))
+(def NINE (DEC TEN))
+
+(def TODIGITS*
+  (Z-combinator
+   (fn [f]
+     (fn [number]
+       ((CONJ (((IF ((LEQ number) NINE)) EMPTY) (fn [x] ((f ((DIV number) TEN)) x)))) ((MOD number) TEN))))))
+
+;;; But wait! The above function produces the wrong results I hear you say.
+;;; Indeed it does. That's because we're using conj/CONJ to accumulate the
+;;; digits, and, as you correctly point out right now, conj/CONJ will
+;;; append to the head of the list (to the first position in the list).
+;;; We have two solutions to our problem:
+;;; 1) Implement CONJ so that it appends to the end of the list
+;;; 2) Implement REVERSE to reverse lists
+
+;;; We'll go for option 2) since when we're done we'll be left with a
+;;; more general function and also since appending to the tail of a
+;;; list is a bad idea in general^tm.
+
+(def REVERSE*
+  (Z-combinator
+   (fn [f]
+     (fn [l]
+       (fn [reversed]
+         (((IF (EMPTY? l)) reversed) (fn [x] (((f (REST l)) ((CONJ reversed) (FIRST l))) x))))))))
+
+(def REVERSE
+  (fn [l] ((REVERSE* l) EMPTY)))
+
+;;; And now we can properly implement TODIGITS:
+
+(def TODIGITS (fn [number] (REVERSE (TODIGITS* number))))
+
+;;; Now we're ready to implement FizzBuzz using nothing but functions.
+
+;;; YAY! \o/
+
+;;; However, one last helper function to pretty print things in the REPL:
+;;; to-string-vector will help us by converting a LIST into a clojure
+;;; seq of clojure strings.
+
+(defn to-string-vector [l]
+  (map to-string (to-vector l)))
+
+;;; And now, without further ado, FizzBuzz:
+
+(def FIZZBUZZ
+  (fn [number]
+    ;; (println (to-integer number))
+    ;; (println (to-boolean (ZERO? ((MOD number) FIFTEEN))))
+    (((IF (ZERO? ((MOD number) FIFTEEN))) FizzBuzz)
+     (((IF (ZERO? ((MOD number) FIVE))) Fizz)
+      (((IF (ZERO? ((MOD number) THREE))) Buzz)
+       (TODIGITS number))))))
+
+(def RUN
+  ((MAP ((RANGE ONE) FIFTEEN)) FIZZBUZZ))
+
+
+
+
+;; [1] http://www.codinghorror.com/blog/2007/02/why-cant-programmers-program.html
+;; [2] http://experthuman.com/programming-with-nothing
