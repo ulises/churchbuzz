@@ -177,40 +177,68 @@
 
 ;;; Numeric operations
 
-;;; Now we need the ability to calculate the remainder of a division, and
-;;; for that we need to know how to increment and decrement a NUMBER.
+;;; The next building block we need to implement is the mod operator. And for
+;;; this, we first need to be able to INCrement and DECrement a NUMBER.
+
+;;; INCrementing a NUMBER is fairly straightforward. If a NUMBER is a function
+;;; that applies an operation a certain number of times, then incrementing
+;;; that NUMBER is simply applying the operation one more time:
 
 (def INC (fn [number] (fn [f] (fn [x] (f ((number f) x))))))
+
+;;; And adding two NUMBERs up is also quite straightforward: for two given
+;;; NUMBERs n and m, and an operation f we apply f m times to the result of
+;;; applying f n times to x:
+
 (def ADD (fn [n] (fn [m] (fn [f] (fn [x] ((m f) ((n f) x)))))))
+
+;;; MULTiplying two NUMBERs m and n is equivalent to ADDing m n times:
 (def MULT (fn [n] (fn [m] ((m (ADD n)) ZERO))))
+
+;;; And so is taking the POWer, but MULTiplying instead of ADDing:
 (def POW (fn [n] (fn [m] ((m (MULT n)) ONE))))
 
+;;; DECrementing a NUMBER is more involved and a better explanation can be
+;;; in the Wikipedia entry for Church Encoding[3]. However, here's the
+;;; implementation:
+
 (def DEC (fn [number] (fn [f] (fn [x] (((number (fn [g] (fn [h] (h (g f)))))  (fn [y] x)) (fn [y] y))))))
+
+;;; SUBstracting two NUMBERs n and m then is based on DECrementing n m times:
+
 (def SUB (fn [n] (fn [m] ((m DEC) n))))
 
-;;; Modulo
-;;; To implement FizzBuzz we need to be able to calculate the mod of two
-;;; numbers. A simple algorithm for doing so is as follows:
-;;;
+;;; Remainder of a division
+
+;;; Now that we have some basic arithmetic operations in place, let's implement
+;;; the mod operator.
+
+;;; A tentative implementation in Clojure would be as follows:
 
 ;; (defn my-mod [n m]
 ;;   (if (>= n m)
 ;;     (my-mod (- n m) m) n))
 
 ;;; however this implementation relies on <= which we're not allowed to use!
-;;; Don't despair, because we can implement <= rather easily by rewriting <=
-;;; to: (defn <= [n m] (<= (- n m) 0))
+
+;;; It looks like we'll have to implement <= before we can implement mod.
+;;; We can implement <= rather easily by rewriting <= to:
+
+;; (defn <= [n m] (<= (- n m) 0))
+
 ;;; (cheating by using <= again)
-;;; This rewrite shows that we can check for leq (lower-equal) checking
-;;; that if the SUBstraction of two numbers is <= 0, then n <= m. Our definition of
-;;; SUB is such that if we try to substract a larger number from a smaller
-;;; one we'll get ZERO so all is good.
 
-(def LEQ (fn [n] (fn [m]
-                  ;; (println "N:" (to-integer n) "<= M:" (to-integer m))
-                  (ZERO? ((SUB n) m)))))
+;;; This rewrite shows that we can check for lower-equal by checking
+;;; if the SUBstraction of the two numbers is <= 0, then n <= m. Additionally,
+;;; our definition of SUB is such that if we try to substract a larger number
+;;; from a smaller one we'll get ZERO so all is good.
 
-;;; With LEQ we can now implement modulo rather easily:
+(def LEQ
+  (fn [n]
+    (fn [m]
+      (ZERO? ((SUB n) m)))))
+
+;;; With LEQ implemented, we can now implement modulo rather easily:
 ;;; We'll rewrite
 
 ;; (defn mymod [n m]
@@ -218,26 +246,28 @@
 
 ;;; using our LEQ implementation and our SUB implementation.
 ;;;
-;;; Initially we may want to write as such:
+;;; Once re-written, our MOD operation looks like:
 ;;;
 ;; (def MOD (fn [n]
 ;;            (fn [m]
 ;;              (((IF ((LEQ m) n)) (((MOD ((SUB n) m)) m) x)) n))))
 
-;;; However this will quickly result in a nasty StackOverflow :-o
-;;; The reason for this is that in clojure, (if...) is lazy in that if
-;;; the predicate is false, then the then-clause is not evaluated. Our
-;;; implementation of IF instead is eager, i.e. it will always evaluate
-;;; both the then-clause and the else-clause regardless of the truthiness
-;;; of the predicate. To work around this we use the fact we used to simplify
-;;; our implementation of IF but in reverse:
-;;; If we have a function f which takes a single parameter x and calls
-;;; a function g with it, i.e. (defn f [x] (g x)), then we can
-;;; replace f with g in all our code.
-;;; Here we do the opposite, where we have a call to g, we introduce f
-;;; so that we are lazy in the evaluation of g. Our g in this case is MOD and
-;;; so we replace ((MOD ((SUB n) m)) m) with (fn [x] (((MOD ((SUB n) m)) m) x))
-;;; which is equivalent in nature but lazy-er! \o/
+;;; However this will quickly result in a nasty StackOverflow :'''(
+
+;;; The reason for this is that in clojure, (if...) is a special form that
+;;; only evaluates the then-clause if the predicate evaluates to true (same
+;;; applies to the else-clause.) Our implementation of IF instead is eager,
+;;; i.e. it will always evaluate both the then-clause and the else-clause
+;;; regardless of the truthiness of the predicate. To work around this we
+;;; use the fact we used to simplify our implementation of IF but in
+;;; reverse: if we have a function f which takes a single parameter x and calls
+;;; a function g with it, i.e. (defn f [x] (g x)), then we can replace f with g
+;;; in all our code.
+;;; Here we will do the opposite, wherever we have a call to g, we will
+;;; introduce a function f so that we delay the evaluation of g. Our g in this
+;;; case is MOD and so we'll replace ((MOD ((SUB n) m)) m) with
+;;; (fn [x] (((MOD ((SUB n) m)) m) x)) which is equivalent in nature but
+;;; lazy-er! \o/
 
 (def MOD-CHEAT
   (fn [n]
@@ -247,8 +277,8 @@
 ;;; Unfortunately, albeit correct, our implementation of MOD relies on
 ;;; a feature of the language we should not rely on: the fact that to define
 ;;; MOD we use MOD as if it had been defined already.
-;;; To solve this, we make use of the Y-combinator
-;;; (http://en.wikipedia.org/wiki/Fixed-point_combinator#Y_combinator).
+;;; To solve this, we make use of the Y-combinator[4].
+
 ;;; Briefly, the Y-combinator solves the assignment problem since
 ;;; when you call the Y-combinator with a function, it will in turn
 ;;; call the function with the function itself as its first argument. Hence
@@ -274,9 +304,9 @@
    (fn [f]
      (fn [n]
        (fn [m]
-         (if (<= (to-integer m) (to-integer n))
-           (fn [x] (((f ((SUB n) m)) m) x))
-           n))))))
+         (((IF ((LEQ  m) n))
+           (fn [x] (((f ((SUB n) m)) m) x)))
+          n))))))
 
 ;;; Ok, now we have a bunch of building blocks for our barebones FizzBuzz
 ;;; however we still need: ranges, map, string literals and a way of
@@ -510,3 +540,5 @@
 
 ;; [1] http://www.codinghorror.com/blog/2007/02/why-cant-programmers-program.html
 ;; [2] http://experthuman.com/programming-with-nothing
+;; [3] http://en.wikipedia.org/wiki/Church_encoding#Computation_with_Church_numerals
+;; [4] http://en.wikipedia.org/wiki/Fixed-point_combinator#Y_combinator

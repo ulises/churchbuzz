@@ -4,6 +4,14 @@
 
 (unfinished)
 
+(facts "The NUMBER ONE applies the operation exactly once"
+  ((ONE identity) 1) => 1
+  (provided (identity 1) => 1 :times 1))
+
+(facts "The NUMBER TWO applies the operation exactly twice"
+  ((TWO identity) 1) => 1
+  (provided (identity 1) => 1 :times 2))
+
 (facts "to-integer produces the right integers"
   (to-integer ZERO) => 0
   (to-integer ONE) => 1
@@ -28,6 +36,10 @@
 (fact "INC increments a number"
   (to-integer (INC ONE)) => 2)
 
+(fact "INC applies the given operation one more time than the provided NUMBER"
+  (((INC TWO) identity) 0) => 0
+  (provided (identity 0) => 0 :times 3))
+
 (fact "ADDition adds two numbers"
   (to-integer ((ADD ONE) TWO)) => 3)
 
@@ -47,7 +59,7 @@
 (fact "FIVE is LEQ than FIFTEEN"
   (to-boolean ((LEQ FIVE) FIFTEEN)) => truthy
   (to-boolean ((LEQ TWO) TWO)) => truthy
-  (to-boolean ((LEQ FIFTEEN) FIVE)))
+  (to-boolean ((LEQ FIFTEEN) FIVE)) => falsey)
 
 (fact "FIVE MOD-CHEAT TWO is 1. FIFTEEN MOD-CHEAT FIVE is 0."
   (to-integer ((MOD-CHEAT THREE) TWO)) => 1
@@ -97,6 +109,7 @@
 
 (fact "REVERSE reverses lists"
   (let [l ((CONJ ((CONJ EMPTY) ONE)) TWO)]
+    (to-integer-vector l) => '(2 1)
     (to-integer-vector (REVERSE l)) => '(1 2)
     (to-integer-vector (REVERSE (REVERSE l))) => (to-integer-vector l)))
 
