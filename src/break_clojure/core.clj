@@ -16,8 +16,7 @@
 ;;; follows:
 
 ;; (defn fizzbuzz [n]
-;;   (cond (and (zero? (mod n 3))
-;;              (zero? (mod n 5))) "FizzBuzz"
+;;   (cond (and (zero? (mod n 15))) "FizzBuzz"
 ;;              (zero? (mod n 3)) "Fizz"
 ;;              (zero? (mod n 5)) "Buzz"
 ;;              :default (str n))
@@ -308,15 +307,16 @@
            (fn [x] (((f ((SUB n) m)) m) x)))
           n))))))
 
-;;; Ok, now we have a bunch of building blocks for our barebones FizzBuzz
+;;; Ok, now we have a bunch of building blocks for our barebones Fizz-Buzz
 ;;; however we still need: ranges, map, string literals and a way of
-;;; converting NUMBER to a string. Let's start with ranges and map.
+;;; converting NUMBERs to strings. Let's start with ranges and map.
 
-;;; To implement ranges and map we need to be able to build lists. The
-;;; building block of lists is a pair (also known as tuple). A pair
-;;; is simply a pair of items (two - not "pair" in the many sense) and
-;;; is sometimes implemented as an array of 2 items. In our case however
-;;; we can only implement this with functions:
+;;; Ranges & Map
+
+;;; To implement ranges we need to be able to build lists. The building block of
+;;; lists is a pair (also known as tuple.) A pair is simply a pair of items
+;;; (two - not "pair" in the many sense) and is sometimes implemented as an array
+;;; of 2 items. In our case however we can only implement this with functions:
 
 (def PAIR (fn [x] (fn [y] (fn [f] ((f x) y)))))
 
@@ -330,8 +330,8 @@
 
 ;;; So, LEFT will call pair with a function that returns its first element
 ;;; (in this case x) and ignore the second (naming the parameter of the
-;;; returned function as _ denotes that it's not important). And RIGHT
-;;; will do the same thing except that it'll return the second value (y).
+;;; returned function as _ denotes that it's not important.) And RIGHT
+;;; will do the same thing except that it'll return the second value: y.
 
 ;;; Now that we have pairs, we can implement linked lists. However,
 ;;; instead of using a pointer to the next item (as it is normally done)
@@ -343,16 +343,13 @@
 (def FIRST (fn [l] (LEFT (RIGHT l))))
 (def REST (fn [l] (RIGHT (RIGHT l))))
 
-;;; now we write a convenience function (just like to-integer and
-;;; to-boolean) that will make our lives easier when inspecting
-;;; our lists:
+;;; For easier inspection in the repl, we also write a convenience function
+;;; (just like to-integer and to-boolean):
 
 (defn to-vector
-  "Convenience function to represent a list as a vector"
+  "Convenience function to represent a list as a Clojure vector"
   ([l] (to-vector l []))
   ([l acc]
-     ;; (println "EMPTY?" (to-boolean (EMPTY? l)))
-     ;; (println "acc:" acc)
      (if (to-boolean (EMPTY? l))
        (reverse acc)
        (recur (REST l) (cons (FIRST l) acc)))))
@@ -376,14 +373,18 @@
      (fn [m]
        (fn [n] (((IF ((LEQ m) n)) (fn [x] (((CONJ ((f (INC m)) n)) m) x))) EMPTY))))))
 
-
 ;;; Ok, ranges out of the way means we need to be able to iterate over them.
 ;;; For this, we're going to implement the map function. map is a higher-order
 ;;; function (HOF) since it takes a function as one of its parameters.
 
-;;; We will implement map using a helper HOF called fold. fold recurseively
+;;; We will implement map using a helper HOF called fold. fold recursively
 ;;; combines the items in a data structure using a combination function which
-;;; is passed as a parameter.
+;;; is passed as a parameter. fold also takes an optional initial item to
+;;; combine with the first item extracted from the collection.
+;;; Take for example folding over a sequence of numbers using + as the
+;;; combination function and initial item 0: (fold [1 2 3] 0 +)
+;;; Evaluating that form above would produce 6.
+;;; Note: fold is sometimes referred to as reduce.
 
 (def FOLD
   (Z-combinator
@@ -396,15 +397,20 @@
               (((g (((f (REST l)) x) g)) (FIRST l)) y)))))))))
 
 ;;; Now that we have a FOLD helper function implemented, writing MAP is simple.
+;;; We'll implement MAP by using FOLD in the following fashion: the initial
+;;; item will be an empty list (EMPTY) and the combination function will
+;;; append items onto the target collection by means of CONJ:
 
 (def MAP
-  (fn [k]
+  (fn [coll]
     (fn [f]
-      (((FOLD k) EMPTY)
+      (((FOLD coll) EMPTY)
        (fn [l]
          (fn [x] ((CONJ l) (f x))))))))
 
-;;; We're nearly there. Recapping, we have the means of:
+;;; We're getting closer.
+
+;;; Recapping, we have the means of:
 ;;; 1) Representing numbers
 ;;; 2) Performing some arithmetic operations with them, including MOD
 ;;; 3) Representing lists of things, including (but not limited to) ranges of
@@ -412,13 +418,17 @@
 ;;; 4) Iterating over lists of things and performing an arbitrary operation
 ;;;    on these things
 
-;;; It looks like all we miss to be able to implement a full version of FizzBuzz
-;;; are strings (and strings representing numbers too!) Let's implement that.
+;;; It looks like all we're missing to be able to implement a full version of
+;;; Fizz-Buzz are strings (and strings representing numbers too!) Let's
+;;; implement that.
+
+;;; Strings
 
 ;;; Strings aren't that difficult to represent. We can represent them as a list
 ;;; of numbers and then interpret each number according an encoding of our
 ;;; choosing.
-;;; For FizzBuzz, it may be overkill to use a general purpose encoding scheme
+
+;;; For Fizz-Buzz, it may be overkill to use a general purpose encoding scheme
 ;;; like ASCII, so we'll design our own. We only need to encode the strings
 ;;; "Fizz", "Buzz", FizzBuzz and the numbers 0 to 9. For the latter, we can
 ;;; simply use the numbers 0 to 9, i.e. 0 represents "0", 1 "1", and so on.
@@ -436,19 +446,22 @@
 
 ;;; Now that we have some string representation for the words Fizz, Buzz and
 ;;; FizzBuzz, let's implement some helper functions for pretty printing these
-;;; in the REPL (just like we did for integers and lists).
+;;; in the REPL (just like we did for integers, booleans, and lists).
 
-(defn to-char [n]
+(defn to-char
+  "Converts an integer between 0 and 14 into a character."
+  [n]
   {:pre [(<= n 14) (>= n 0)]}
   (nth (seq "0123456789BFiuz") n))
 
-(defn to-string [s]
+(defn to-string
+  "Converts a LIST of NUMBERs to a Clojure string."
+  [s]
   (apply str (map to-char (to-integer-vector s))))
 
 ;;; The final piece of the puzzle is the ability to represent a number as a
-;;; string, e.g. 154 as "154".
-;;; The first thing we need is a function that'll split a natural number into
-;;; a sequence of its digits, e.g. 154 -> '(1 5 4)
+;;; string, e.g. 154 as "154". For this, we first need a function that'll
+;;; split a natural number into a sequence of its digits, e.g. 154 -> '(1 5 4)
 
 ;;; An example implementation in clojure is as follows:
 
@@ -485,11 +498,12 @@
        ((CONJ (((IF ((LEQ number) NINE)) EMPTY) (fn [x] ((f ((DIV number) TEN)) x)))) ((MOD number) TEN))))))
 
 ;;; But wait! The above function produces the wrong results I hear you say.
-;;; Indeed it does. That's because we're using conj/CONJ to accumulate the
-;;; digits, and, as you correctly point out right now, conj/CONJ will
-;;; append to the head of the list (to the first position in the list).
+;;; Indeed it does. For the NUMBER 154 it will produce the list (4 5 1).
+;;; That's because we're using conj/CONJ to accumulate the digits, and, as you
+;;; correctly point out right now, conj/CONJ will append to the head of the
+;;; list (to the first position in the list).
 ;;; We have two solutions to our problem:
-;;; 1) Implement CONJ so that it appends to the end of the list
+;;; 1) Implement an operation PUSH that appends to the end of the list or
 ;;; 2) Implement REVERSE to reverse lists
 
 ;;; We'll go for option 2) since when we're done we'll be left with a
@@ -510,23 +524,23 @@
 
 (def TODIGITS (fn [number] (REVERSE (TODIGITS* number))))
 
-;;; Now we're ready to implement FizzBuzz using nothing but functions.
+;;; Now we're ready to implement Fizz-Buzz using nothing but functions.
 
 ;;; YAY! \o/
 
 ;;; However, one last helper function to pretty print things in the REPL:
-;;; to-string-vector will help us by converting a LIST into a clojure
-;;; seq of clojure strings.
+;;; to-string-vector will help us by converting a LIST of our STRINGS
+;;; into a clojure seq of clojure strings:
 
-(defn to-string-vector [l]
+(defn to-string-vector
+  "Converts a LIST of STRING into a Clojure seq of strings."
+  [l]
   (map to-string (to-vector l)))
 
 ;;; And now, without further ado, FizzBuzz:
 
 (def FIZZBUZZ
   (fn [number]
-    ;; (println (to-integer number))
-    ;; (println (to-boolean (ZERO? ((MOD number) FIFTEEN))))
     (((IF (ZERO? ((MOD number) FIFTEEN))) FizzBuzz)
      (((IF (ZERO? ((MOD number) FIVE))) Fizz)
       (((IF (ZERO? ((MOD number) THREE))) Buzz)
@@ -535,7 +549,9 @@
 (def RUN
   ((MAP ((RANGE ONE) FIFTEEN)) FIZZBUZZ))
 
+(println (to-string-vector RUN))
 
+;;; The end
 
 
 ;; [1] http://www.codinghorror.com/blog/2007/02/why-cant-programmers-program.html
