@@ -553,6 +553,202 @@
 
 ;;; The end
 
+;;; Addendum
+
+;;; Now that we have implemented Fizz-Buzz one can only wonder how far we can
+;;; get with functions, i.e. what other data structures can we implement, what
+;;; other flow control mechanisms can we implement, etc.?
+
+;;; Let's try implementing a hash table on top of the already existing
+;;; implementation of LISTs (note: we're not really caring about performance
+;;; of hash-tables at this point, hence we're happy enough to use LISTs as our
+;;; underlying data structure for holding the key-value pairs.)
+
+;;; First we define an empty hashtable
+
+(def EMPTY-HASH EMPTY)
+
+;;; Now we need to define how we're going to store the key-value pairs (there's
+;;; a hint there already.)
+
+;;; If you recall, in order to build LISTs, we defined PAIR which was a tuple
+;;; of two elements. We could reuse PAIR to store key-value pairs instead and
+;;; put these in LISTs (as opposed to single values.)
+
+(def PUT
+  (fn [table]
+    (fn [k]
+      (fn [v]
+        ((CONJ table) ((PAIR k) v))))))
+
+;;; Ok, that's great. But wait! Storing key-value pairs as is means that ...
+;;; ...yes! We are allowing duplicate keys. That's clearly a no-no. Let's fix
+;;; that, shall we?
+
+;;; Initially, we could try and walk the list looking for duplicates when we're
+;;; PUTting a new key-value pair. Or even overriding the value for the given key
+;;; if it exists. However, considering we're lazy, we'll go for an easier
+;;; solution.
+
+;;; Prior to PUTting a key-value pair, we will remove all entries with the given
+;;; key. This means we need to implement a REMOVE operation. Let's do that.
+
+;;; Here's a proposal for REMOVE in Clojure:
+
+;; (defn remove
+;;   ([key table] (remove key table '()))
+;;   ([key table acc]
+;;      (if (empty? table) acc
+;;          (if (= key (left (first table)))
+;;            (recur (rest table) acc)
+;; (recur (rest table) (conj acc (first table)))))))
+
+;;; We traverse the HASHTABLE (which is a LIST) checking each key to see if
+;;; it's the key we want to remove. If so, we recurse without adding the pair
+;;; to the accumulator.
+
+;;; That looks like it should work, and most of it should be easy to translate
+;;; to using the constructs we've implemented already, e.g. IF, EMPTY?, CONJ
+;;; and Z-combinator for recursion. However we never implemented EQ, only LEQ.
+;;; So, before we can implement REMOVE, we have to implement EQ.
+
+;;; Now the question is: how can we implement EQ?
+
+;;; Well, let's just start by implementing EQ for NUMBERs. Two NUMBERs, n and m,
+;;; are equal if the following is true: n - m = 0. Or is it? In our case, we
+;;; defined SUB so that if n < m and we try to ((SUB n) m) we'll get ZERO. So
+;;; we must account for this and check both that n - m = 0 AND that m - n = 0.
+
+;;; This means that in order to implement EQ, we must first implement AND. Fine.
+
+(def AND
+  (fn [bool1]
+    (fn [bool2]
+      ((bool1 bool2) bool1))))
+
+;;; While we're at it, let's implement OR and NOT.
+
+(def OR
+  (fn [bool1]
+    (fn [bool2]
+      ((bool2 bool2) bool1))))
+
+(def NOT
+  (fn [bool]
+    (fn [x]
+      (fn [y] ((bool y) x)))))
+
+;;; Right, now we can implement EQ by means of ZERO?, SUB, and AND:
+
+(def EQ
+  (fn [n]
+    (fn [m]
+      ((AND (ZERO? ((SUB n) m))) (ZERO? ((SUB m) n))))))
+
+;;; Righty-o! Let's move on now.
+
+;;; Let's look at the clojure version of remove once more:
+
+;; (defn remove
+;;   ([key table] (remove key table '()))
+;;   ([key table acc]
+;;      (if (empty? table) acc
+;;          (if (= key (left (first table)))
+;;            (recur key (rest table) acc)
+;; (recur key (rest table) (conj acc (first table)))))))
+
+;;; And let's rewrite it using our constructs:
+
+(def REMOVE*
+  (Z-combinator
+   (fn [f]
+     (fn [table]
+       (fn [key]
+         (fn [acc]
+           (((IF (EMPTY? table)) (REVERSE acc))
+            (fn [x]
+              ((((IF ((EQ key) (LEFT (FIRST table))))
+                (((f (REST table)) key) acc))
+               (((f (REST table)) key) ((CONJ acc) (FIRST table)))) x)))))))))
+
+(def REMOVE
+  (fn [table]
+    (fn [key]
+      (((REMOVE* table) key) EMPTY-HASH))))
+
+;;; Perfect. We can now store and remove key-value pairs from a hashtable.
+
+;;; Wouldn't it be great if we could GET values from the hashtable?
+;;; Let's implement that.
+
+;;; As usual, let's propose an implementation of get in pure clojure and then
+;;; rewrite using our building blocks.
+
+;; (defn get [table key]
+;;   (if (empty? table) '()
+;;       (if (= key (left (first table)))
+;;         (conj (conj empty value) key)
+;;         (recur (rest table) key))))
+
+;;; That looks like it would work. But what's going on there? Why the empty list
+;;; when the key was not found?
+
+;;; When a key is not found in the hashtable, we have to return something
+;;; anyway. However, we'd like this returned thing to signal that the key was
+;;; not found. To overcome this issue I decided that GET returns a LIST with
+;;; two items. If the key is in the hashtable, then the key and the value will
+;;; be in that list. Otherwise, the LIST will be empty. Then we can check
+;;; for success using EMPTY?
+
+;;; Judging from the literature (a few google searches actually), the convention
+;;; is to represent NIL with the EMPTY LIST anyway, so this is not such a crazy
+;;; idea.
+
+(def GET
+  (Z-combinator
+   (fn [f]
+     (fn [table]
+       (fn [key]
+         (((IF (EMPTY? table)) EMPTY)
+          (((IF ((EQ key) (LEFT (FIRST table)))) ((CONJ ((CONJ EMPTY) (RIGHT (FIRST table)))) key))
+           (fn [x] (((f (REST table)) key) x)))))))))
+
+;;; Albeit contrived, that looks like it would work (it actually does according
+;;; to the tests, but hey.)
+
+;;; Since GET returns either an EMPTY LIST or a LIST with the key and the value
+;;; let's implement KEY and VALUE to extract these.
+
+(def KEY
+  (fn [l]
+    (FIRST l)))
+
+(def VALUE
+  (fn [l]
+    (FIRST (REST l))))
+
+;;; Let's also have a function to convert the entries of our HASHTABLE into
+;;; something printable in the REPL:
+
+(defn to-key-value
+  [pair]
+  (list (to-string (KEY pair)) (to-string (VALUE pair))))
+
+(defn to-key-value-pairs
+  [table]
+  (map to-key-value (to-vector table)))
+
+;;; Up to this point we have a working implementation of hash tables. However,
+;;; this implementation restricts keys to being NUMBERs only (due to the use
+;;; of EQ) and we're now going to extend that.
+
+;; let eq = \n. n (\x m. is0 m false (x (pred m))) is0
+;; (def EQ
+;;   (fn [n]
+;;     (n (fn [x] (fn [m] (ZERO? (((ZERO? m) FALSE) (x (DEC m)))))))))
+;; (def EQ
+;;   (fn [n]
+;;     (n (ZERO? (fn [x] (fn [y] ((FALSE y) x)))))))
 
 ;; [1] http://www.codinghorror.com/blog/2007/02/why-cant-programmers-program.html
 ;; [2] http://experthuman.com/programming-with-nothing

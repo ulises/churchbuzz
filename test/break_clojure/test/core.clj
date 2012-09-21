@@ -127,3 +127,64 @@ otherwise"
   (to-string (FIZZBUZZ THREE)) => (to-string Buzz)
   (to-string (FIZZBUZZ FIVE)) => (to-string Fizz)
   (to-string (FIZZBUZZ FIFTEEN)) => (to-string FizzBuzz))
+
+(fact "An empty hash-table is EMPTY?"
+  (to-boolean (EMPTY? EMPTY-HASH)) => truthy)
+
+(fact "Can store key-value pairs"
+  (let [k Fizz
+        v FIVE
+        table (((PUT EMPTY-HASH) k) v)]
+    (to-integer (RIGHT (FIRST table))) => 5
+    (to-string (LEFT (FIRST table))) => "Fizz"))
+
+(fact "logical AND is not utterly crazy"
+  (to-boolean ((AND TRUE) FALSE)) => falsey
+  (to-boolean ((AND TRUE) TRUE)) => truthy
+  (to-boolean ((AND FALSE) TRUE)) => falsey
+  (to-boolean ((AND FALSE) FALSE)) => falsey)
+
+(fact "logical OR is not insane either"
+  (to-boolean ((OR TRUE) FALSE)) => truthy
+  (to-boolean ((OR TRUE) TRUE)) => truthy
+  (to-boolean ((OR FALSE) TRUE)) => truthy
+  (to-boolean ((OR FALSE) FALSE)) => falsey)
+
+(fact "NOT negates truthyness"
+  (to-boolean (NOT TRUE)) => falsey
+  (to-boolean (NOT FALSE)) => truthy)
+
+(fact "EQ checks for equality between NUMBERs"
+  (to-boolean ((EQ FIVE) FIVE)) => truthy
+  (to-boolean ((EQ FIVE) THREE)) => falsey
+  (to-boolean ((EQ THREE) FIVE)) => falsey)
+
+(fact "REMOVE does nothing on an empty HASH-TABLE"
+  (to-boolean (EMPTY? ((REMOVE EMPTY-HASH) FIVE))) => truthy)
+
+(fact "REMOVE removes the value for a numeric key in a hashtable"
+  (let [k THREE
+        v FIVE
+        table (((PUT EMPTY-HASH) k) v)]
+    (to-boolean (EMPTY? ((REMOVE table) k))) => truthy
+    (to-boolean (EMPTY? ((REMOVE table) ONE))) => falsey))
+
+(fact "GET retrieves key-value pairs from HASHTABLEs"
+  (let [k THREE
+        v FIVE
+        table (((PUT EMPTY-HASH) k) v)]
+    (to-boolean (EMPTY? ((GET table) ONE))) => truthy
+    (to-boolean (EMPTY? ((GET table) k))) => falsey
+    (to-integer (VALUE ((GET table) k))) => 5))
+
+(fact "Old values do not override newer values in hashtables"
+  (let [k (TODIGITS THREE)
+        v1 (TODIGITS FIVE)
+        v2 (TODIGITS FIFTEEN)
+        v3 (TODIGITS ONE-HUNDRED)
+        table (((PUT EMPTY-HASH) k) v1)
+        table2 (((PUT table) k) v2)
+        table3 (((PUT table2) k) v3)]
+    (VALUE ((GET table3) k)) => v3
+    (VALUE ((GET ((REMOVE table3) k)) k)) => v2
+    (VALUE ((GET ((REMOVE ((REMOVE table3) k)) k)) k)) => v1))
