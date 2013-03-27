@@ -16,10 +16,10 @@
 ;;; follows:
 
 ;; (defn fizzbuzz [n]
-;;   (cond (and (zero? (mod n 15))) "FizzBuzz"
-;;              (zero? (mod n 3)) "Fizz"
-;;              (zero? (mod n 5)) "Buzz"
-;;              :default (str n))
+;;   (cond (zero? (mod n 15)) "FizzBuzz"
+;;         (zero? (mod n 3)) "Fizz"
+;;         (zero? (mod n 5)) "Buzz"
+;;         :default (str n)))
 
 ;; (defn run []
 ;;   (map fizzbuzz (range 1 101)))
@@ -582,16 +582,22 @@
         ((CONJ table) ((PAIR k) v))))))
 
 ;;; Ok, that's great. But wait! Storing key-value pairs as is means that ...
-;;; ...yes! We are allowing duplicate keys. That's clearly a no-no. Let's fix
-;;; that, shall we?
+;;; ...yes! We are allowing duplicate keys. What's that all about? Well, we
+;;; could see this effect in two ways:
+;;; 1) Having duplicate keys is wrong and we should avoid it
+;;; 2) Having duplicate keys is ok as long as we always return the last value
+;;;    the user has stored in the table.
 
+;;; If we go for 1) then we need to remove all duplicates from the table.
 ;;; Initially, we could try and walk the list looking for duplicates when we're
 ;;; PUTting a new key-value pair. Or even overriding the value for the given key
-;;; if it exists. However, considering we're lazy, we'll go for an easier
-;;; solution.
+;;; if it exists. However, we'll go for option 2).
 
-;;; Prior to PUTting a key-value pair, we will remove all entries with the given
-;;; key. This means we need to implement a REMOVE operation. Let's do that.
+;;; Option 2) is appealing because it'll keep old values for a given key around
+;;; (we're also *very* lazy and don't want to change the current behaviour of
+;;; PUT ;)
+
+;;; Now that we can PUT values into HASHTABLEs, let's work on REMOVEing them.
 
 ;;; Here's a proposal for REMOVE in Clojure:
 
@@ -605,12 +611,14 @@
 
 ;;; We traverse the HASHTABLE (which is a LIST) checking each key to see if
 ;;; it's the key we want to remove. If so, we recurse without adding the pair
-;;; to the accumulator.
+;;; to the accumulator. Otherwise, we add the pair we're checking and move on.
 
 ;;; That looks like it should work, and most of it should be easy to translate
 ;;; to using the constructs we've implemented already, e.g. IF, EMPTY?, CONJ
-;;; and Z-combinator for recursion. However we never implemented EQ, only LEQ.
-;;; So, before we can implement REMOVE, we have to implement EQ.
+;;; and the Z-combinator for recursion. However we never implemented EQ, only
+;;; LEQ.
+
+;;; Before we can implement REMOVE, we have to implement EQ.
 
 ;;; Now the question is: how can we implement EQ?
 
@@ -626,17 +634,27 @@
     (fn [bool2]
       ((bool1 bool2) bool1))))
 
+;;; The result of evaluating ((AND bool1) bool2) depends heavily on whether
+;;; bool1 is TRUE or not. If it is TRUE, then the result of evaluating the AND
+;;; expression is simply bool2, otherwise it's bool1 (FALSE).
+
 ;;; While we're at it, let's implement OR and NOT.
 
 (def OR
   (fn [bool1]
     (fn [bool2]
-      ((bool2 bool2) bool1))))
+      ((bool1 bool1) bool2))))
+
+;;; OR is pretty similar to AND, with the exception that if bool1 is TRUE, then
+;;; we stop there and OR evaluatues to TRUE.
 
 (def NOT
   (fn [bool]
     (fn [x]
       (fn [y] ((bool y) x)))))
+
+;;; As expected, NOT reverses the parameters passed to TRUE/FALSE, hence TRUE
+;;; becomes FALSE and vice-versa.
 
 ;;; Right, now we can implement EQ by means of ZERO?, SUB, and AND:
 
@@ -678,7 +696,7 @@
 
 ;;; Perfect. We can now store and remove key-value pairs from a hashtable.
 
-;;; Wouldn't it be great if we could GET values from the hashtable?
+;;; Wouldn't it be great if we could GET values from the hashtable too?
 ;;; Let's implement that.
 
 ;;; As usual, let's propose an implementation of get in pure clojure and then
@@ -695,14 +713,14 @@
 
 ;;; When a key is not found in the hashtable, we have to return something
 ;;; anyway. However, we'd like this returned thing to signal that the key was
-;;; not found. To overcome this issue I decided that GET returns a LIST with
-;;; two items. If the key is in the hashtable, then the key and the value will
-;;; be in that list. Otherwise, the LIST will be empty. Then we can check
-;;; for success using EMPTY?
+;;; not found. To overcome this issue I decided that GET will always return a
+;;; LIST. If the key is in the hashtable, then the key and the value will
+;;; be in that list. Otherwise, the LIST will be empty. Callers of GET can then
+;;; check for success using EMPTY?
 
 ;;; Judging from the literature (a few google searches actually), the convention
-;;; is to represent NIL with the EMPTY LIST anyway, so this is not such a crazy
-;;; idea.
+;;; seems to be to represent NIL with the EMPTY LIST anyway, so this is not such
+;;; a crazy idea.
 
 (def GET
   (Z-combinator
@@ -732,7 +750,7 @@
 
 (defn to-key-value
   [pair]
-  (list (to-string (KEY pair)) (to-string (VALUE pair))))
+  (list (to-integer (KEY pair)) (to-string (VALUE pair))))
 
 (defn to-key-value-pairs
   [table]
@@ -741,14 +759,6 @@
 ;;; Up to this point we have a working implementation of hash tables. However,
 ;;; this implementation restricts keys to being NUMBERs only (due to the use
 ;;; of EQ) and we're now going to extend that.
-
-;; let eq = \n. n (\x m. is0 m false (x (pred m))) is0
-;; (def EQ
-;;   (fn [n]
-;;     (n (fn [x] (fn [m] (ZERO? (((ZERO? m) FALSE) (x (DEC m)))))))))
-;; (def EQ
-;;   (fn [n]
-;;     (n (ZERO? (fn [x] (fn [y] ((FALSE y) x)))))))
 
 ;; [1] http://www.codinghorror.com/blog/2007/02/why-cant-programmers-program.html
 ;; [2] http://experthuman.com/programming-with-nothing
